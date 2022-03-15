@@ -14,7 +14,9 @@
 //
 package main
 
-import "testing"
+import (
+	"testing"
+)
 
 func TestDist_Validate(t *testing.T) {
 	ReleaseCandidate = "2.11.0"
@@ -52,6 +54,43 @@ func TestDist_Validate2(t *testing.T) {
 			t.Run(tt.name, func(t *testing.T) {
 				tt.dist.ValidAllLinks()
 			})
+		})
+	}
+}
+
+func TestDist_ValidChecksum(t *testing.T) {
+	ReleaseCandidate = "2.11.0"
+
+	dist := NewDashboardDist()
+	ok, err := dist.ValidChecksum()
+	if err != nil {
+		t.Error(err)
+	}
+
+	if !ok {
+		t.FailNow()
+	}
+}
+
+func TestDist_downloadSrc(t *testing.T) {
+	ReleaseCandidate = "2.11.0"
+	tests := []struct {
+		name    string
+		dist    Dist
+		wantErr bool
+	}{
+		{
+			name:    "download dashboard src package",
+			dist:    NewDashboardDist(),
+			wantErr: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tt.dist.SetTimeout(10)
+			if err := tt.dist.fetchSrc(); (err != nil) != tt.wantErr {
+				t.Errorf("fetchSrc() error = %v, wantErr %v", err, tt.wantErr)
+			}
 		})
 	}
 }

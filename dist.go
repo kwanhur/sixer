@@ -15,9 +15,13 @@
 package main
 
 import (
+	"bytes"
+	"crypto/sha512"
 	"fmt"
 	"log"
 	"net/http"
+	"os"
+	"strings"
 	"time"
 
 	"github.com/parnurzeal/gorequest"
@@ -51,9 +55,13 @@ func (c *Candidate) Package2() string {
 	return fmt.Sprintf("%s-%s-%s", pkgPrefix2, c.pkg, c.rc)
 }
 
+func (c *Candidate) srcTgz() string {
+	return fmt.Sprintf("%s-src.tgz", c.Package2())
+}
+
 // SrcLink source package URL
 func (c *Candidate) SrcLink() string {
-	return fmt.Sprintf("%s/%s-src.tgz", c.PackageLink(), c.Package2())
+	return fmt.Sprintf("%s/%s", c.PackageLink(), c.srcTgz())
 }
 
 // SrcAscLink source package asc URL
@@ -61,15 +69,25 @@ func (c *Candidate) SrcAscLink() string {
 	return fmt.Sprintf("%s/%s-src.tgz.asc", c.PackageLink(), c.Package2())
 }
 
+func (c Candidate) srcTgzSha512() string {
+	return fmt.Sprintf("%s-src.tgz.sha512", c.Package2())
+}
+
 // SrcSha512Link source package sha512 URL
 func (c *Candidate) SrcSha512Link() string {
-	return fmt.Sprintf("%s/%s-src.tgz.sha512", c.PackageLink(), c.Package2())
+	return fmt.Sprintf("%s/%s", c.PackageLink(), c.srcTgzSha512())
 }
 
 // A Dist repo include package and its asc sha512
 type Dist struct {
 	Candidate
 	timeout int
+	force   bool // force recover existed packages
+}
+
+// SetTimeout set dist request timeout, unit second
+func (d *Dist) SetTimeout(t int) {
+	d.timeout = t
 }
 
 func (d *Dist) keysLink() string {
@@ -111,6 +129,133 @@ func (d *Dist) ValidAllLinks() {
 	}
 }
 
+func (d *Dist) fetchSrc() error {
+	if d.force {
+		if err := os.Remove(d.srcTgz()); err != nil && !os.IsNotExist(err) {
+			return err
+		}
+	} else {
+		if f, err := os.Stat(d.srcTgz()); err != nil && !os.IsNotExist(err) {
+			return err
+		} else if f != nil {
+			return nil
+		}
+	}
+
+	var err error
+	r := gorequest.New()
+	sa := r.Timeout(time.Duration(d.timeout) * time.Second)
+
+	sa.Get(d.SrcLink()).EndBytes(func(res gorequest.Response, body []byte, errs []error) {
+		if len(errs) != 0 {
+			err = errs[0]
+			return
+		}
+
+		if res.StatusCode != http.StatusOK {
+			err = fmt.Errorf("non-expected response status %s", res.Status)
+			return
+		}
+
+		if len(body) == 0 {
+			err = fmt.Errorf("response body size zero")
+			return
+		}
+
+		err = os.WriteFile(d.srcTgz(), body, 0644)
+	})
+
+	return err
+}
+
+func (d *Dist) fetchSrcChecksum() ([]byte, error) {
+	var checksum []byte
+	var err error
+
+	if !d.force {
+		checksum, err = os.ReadFile(d.srcTgzSha512())
+
+		if os.IsNotExist(err) {
+			goto download
+		}
+		return checksum, nil
+	}
+
+	if d.force {
+		if err := os.Remove(d.srcTgz()); err != nil && !os.IsNotExist(err) {
+			return nil, err
+		}
+	}
+
+download:
+	r := gorequest.New()
+	sa := r.Timeout(time.Duration(d.timeout) * time.Second)
+
+	sa.Get(d.SrcSha512Link()).EndBytes(func(res gorequest.Response, body []byte, errs []error) {
+		if len(errs) != 0 {
+			err = errs[0]
+			return
+		}
+
+		if res.StatusCode != http.StatusOK {
+			err = fmt.Errorf("non-expected response status %s", res.Status)
+			return
+		}
+
+		if len(body) == 0 {
+			err = fmt.Errorf("response checksum size zero")
+			return
+		}
+
+		checksum = body
+	})
+
+	return checksum, nil
+}
+
+func (d *Dist) checksum(src []byte, body []byte) (bool, error) {
+	var err error
+
+	sums := bytes.Split(body, []byte("  "))
+	if len(sums) != 2 {
+		return false, fmt.Errorf("invalid checksum body")
+	}
+
+	if len(src) == 0 {
+		filename := strings.TrimSpace(string(sums[1]))
+		src, err = os.ReadFile(filename)
+		if err != nil {
+			return false, err
+		}
+	}
+
+	hash := sha512.New()
+	hash.Write(src)
+	checksum := fmt.Sprintf("%x", hash.Sum(nil))
+	ret := strings.Compare(string(sums[0]), checksum)
+
+	return ret == 0, nil
+}
+
+// ValidChecksum validate from sha512 checksum file
+func (d *Dist) ValidChecksum() (bool, error) {
+	if err := d.fetchSrc(); err != nil {
+		return false, err
+	}
+
+	checksum, err := d.fetchSrcChecksum()
+	if err != nil {
+		return false, err
+	}
+
+	src, err := os.ReadFile(d.srcTgz())
+	if err != nil {
+		return false, err
+	}
+
+	return d.checksum(src, checksum)
+}
+
 // NewDashboardDist dashboard dist
 func NewDashboardDist() Dist {
 	return Dist{
@@ -137,4 +282,11 @@ var dashboardCmd = &cobra.Command{
 func dashboardRun(cmd *cobra.Command, args []string) {
 	dist := NewDashboardDist()
 	dist.ValidAllLinks()
+	if ok, err := dist.ValidChecksum(); err != nil {
+		log.Fatalf("dist validate checksum failed: %s\n", err)
+	} else if ok {
+		log.Fatalln("dist validate checksum successfully")
+	} else {
+		log.Fatalln("dist validate checksum failed")
+	}
 }
