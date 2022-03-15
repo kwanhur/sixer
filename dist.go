@@ -36,7 +36,8 @@ type Candidate struct {
 	rc  string // release candidate version, like: 0.2.0
 }
 
-func (c *Candidate) PkgLink() string {
+// PackageLink complete URL for package directory
+func (c *Candidate) PackageLink() string {
 	return fmt.Sprintf("%s%s", baseLink, c.Package())
 }
 
@@ -50,18 +51,22 @@ func (c *Candidate) Package2() string {
 	return fmt.Sprintf("%s-%s-%s", pkgPrefix2, c.pkg, c.rc)
 }
 
+// SrcLink source package URL
 func (c *Candidate) SrcLink() string {
-	return fmt.Sprintf("%s/%s-src.tgz", c.PkgLink(), c.Package2())
+	return fmt.Sprintf("%s/%s-src.tgz", c.PackageLink(), c.Package2())
 }
 
+// SrcAscLink source package asc URL
 func (c *Candidate) SrcAscLink() string {
-	return fmt.Sprintf("%s/%s-src.tgz.asc", c.PkgLink(), c.Package2())
+	return fmt.Sprintf("%s/%s-src.tgz.asc", c.PackageLink(), c.Package2())
 }
 
+// SrcSha512Link source package sha512 URL
 func (c *Candidate) SrcSha512Link() string {
-	return fmt.Sprintf("%s/%s-src.tgz.sha512", c.PkgLink(), c.Package2())
+	return fmt.Sprintf("%s/%s-src.tgz.sha512", c.PackageLink(), c.Package2())
 }
 
+// A Dist repo include package and its asc sha512
 type Dist struct {
 	Candidate
 	timeout int
@@ -92,8 +97,9 @@ func (d *Dist) validLink(link string) (bool, error) {
 	return valid, err
 }
 
-func (d Dist) ValidAllLinks() {
-	links := []string{d.PkgLink(), d.SrcLink(), d.SrcAscLink(), d.SrcSha512Link()}
+// ValidAllLinks validate URL links, include package and its src asc sha512
+func (d *Dist) ValidAllLinks() {
+	links := []string{d.PackageLink(), d.SrcLink(), d.SrcAscLink(), d.SrcSha512Link()}
 	for _, link := range links {
 		if ok, err := d.validLink(link); err != nil {
 			log.Fatalf("dist %s validate failed:%s\n", link, err)
@@ -105,6 +111,7 @@ func (d Dist) ValidAllLinks() {
 	}
 }
 
+// NewDashboardDist dashboard dist
 func NewDashboardDist() Dist {
 	return Dist{
 		Candidate: Candidate{
@@ -116,11 +123,10 @@ func NewDashboardDist() Dist {
 }
 
 var dashboardCmd = &cobra.Command{
-	Use:   "dashboard",
-	Short: "apisix dashboard package verifier",
-	Run: func(cmd *cobra.Command, args []string) {
-		verifyDashboard()
-	},
+	Use:              "dashboard",
+	Short:            "apisix dashboard package verifier",
+	PersistentPreRun: sixerPreRun,
+	Run:              dashboardRun,
 }
 
 // verify package
@@ -128,7 +134,7 @@ var dashboardCmd = &cobra.Command{
 // 2. download packages
 // 3. verify checksum and signature
 // 4. untar then check LICENSE and NOTICE
-func verifyDashboard() {
+func dashboardRun(cmd *cobra.Command, args []string) {
 	dist := NewDashboardDist()
 	dist.ValidAllLinks()
 }

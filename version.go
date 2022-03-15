@@ -48,5 +48,5 @@ var verboseCmd = &cobra.Command{
 func showVerbose() {
 	fmt.Printf("apisixer version: %s\n", version)
 	fmt.Printf("go version: %s\n", runtime.Version())
-	fmt.Printf("git Commit: %s\n", Commit)
+	fmt.Printf("git commit: %s\n", commit)
 }

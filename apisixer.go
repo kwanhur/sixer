@@ -20,13 +20,12 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var Commit string
+var commit string
 
 var sixer = &cobra.Command{
-	Use:              "apisixer",
-	Short:            "Apache APISIX release candidate verifier",
-	PersistentPreRun: sixerPreRun,
-	Run:              sixerRun,
+	Use:   "apisixer",
+	Short: "Apache APISIX release candidate verifier",
+	Run:   sixerRun,
 }
 
 func init() {
@@ -50,6 +49,10 @@ func sixerPreRun(cmd *cobra.Command, args []string) {
 func sixerRun(cmd *cobra.Command, args []string) {
 	if Version {
 		showVersion()
+	}
+
+	if Verbose {
+		showVerbose()
 	}
 }
 
