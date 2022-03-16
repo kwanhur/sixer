@@ -21,17 +21,23 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"os/exec"
 	"strings"
 	"time"
+
+	"github.com/ProtonMail/go-crypto/openpgp"
+	"github.com/ProtonMail/go-crypto/openpgp/armor"
+	"github.com/ProtonMail/go-crypto/openpgp/packet"
 
 	"github.com/parnurzeal/gorequest"
 	"github.com/spf13/cobra"
 )
 
 const (
-	baseLink   = "https://dist.apache.org/repos/dist/dev/apisix/"
-	pkgPrefix  = "apisix"
-	pkgPrefix2 = "apache-apisix"
+	baseLink    = "https://dist.apache.org/repos/dist/dev/apisix/"
+	pkgPrefix   = "apisix"
+	pkgPrefix2  = "apache-apisix"
+	keyFilename = ".key"
 )
 
 // A Candidate represents package with specified version
@@ -64,12 +70,16 @@ func (c *Candidate) SrcLink() string {
 	return fmt.Sprintf("%s/%s", c.PackageLink(), c.srcTgz())
 }
 
-// SrcAscLink source package asc URL
-func (c *Candidate) SrcAscLink() string {
-	return fmt.Sprintf("%s/%s-src.tgz.asc", c.PackageLink(), c.Package2())
+func (c *Candidate) srcTgzAsc() string {
+	return fmt.Sprintf("%s-src.tgz.asc", c.Package2())
 }
 
-func (c Candidate) srcTgzSha512() string {
+// SrcAscLink source package asc URL
+func (c *Candidate) SrcAscLink() string {
+	return fmt.Sprintf("%s/%s", c.PackageLink(), c.srcTgzAsc())
+}
+
+func (c *Candidate) srcTgzSha512() string {
 	return fmt.Sprintf("%s-src.tgz.sha512", c.Package2())
 }
 
@@ -81,8 +91,9 @@ func (c *Candidate) SrcSha512Link() string {
 // A Dist repo include package and its asc sha512
 type Dist struct {
 	Candidate
-	timeout int
-	force   bool // force recover existed packages
+	timeout   int
+	force     bool // force recover existed packages
+	announcer string
 }
 
 // SetTimeout set dist request timeout, unit second
@@ -182,7 +193,7 @@ func (d *Dist) fetchSrcChecksum() ([]byte, error) {
 	}
 
 	if d.force {
-		if err := os.Remove(d.srcTgz()); err != nil && !os.IsNotExist(err) {
+		if err := os.Remove(d.srcTgzSha512()); err != nil && !os.IsNotExist(err) {
 			return nil, err
 		}
 	}
@@ -213,6 +224,111 @@ download:
 	return checksum, nil
 }
 
+func (d *Dist) validKey() (bool, error) {
+	key, err := os.Open(keyFilename)
+	if err != nil {
+		return false, err
+	}
+	defer key.Close()
+
+	entities, err := openpgp.ReadArmoredKeyRing(key)
+	if err != nil {
+		return false, err
+	}
+
+	if len(entities) != 0 {
+		return false, fmt.Errorf("should be one entity in key")
+	}
+
+	id := entities[0].PrimaryIdentity()
+	if id == nil {
+		return false, fmt.Errorf("there's no primary identity")
+	}
+
+	return strings.HasPrefix(id.Name, d.announcer), nil
+}
+
+func (d *Dist) fetchKey() (*os.File, error) {
+	if d.force {
+		if err := os.Remove(keyFilename); err != nil && !os.IsNotExist(err) {
+			return nil, err
+		}
+		goto export
+	} else {
+		if _, err := os.Stat(keyFilename); err != nil && !os.IsNotExist(err) {
+			return nil, err
+		} else if os.IsNotExist(err) {
+			goto export
+		} else {
+			if ok, err := d.validKey(); err != nil {
+				return nil, err
+			} else if !ok {
+				goto export
+			}
+			return os.Open(keyFilename)
+		}
+	}
+
+export:
+	cmd := exec.Command("gpg", "--export", d.announcer, "--output", keyFilename)
+	if err := cmd.Run(); err != nil {
+		return nil, err
+	}
+	if !cmd.ProcessState.Success() {
+		return nil, fmt.Errorf("gpg export %s keyfile failed", d.announcer)
+	}
+
+	return os.Open(keyFilename)
+}
+
+func (d *Dist) fetchSrcSignature() (*os.File, error) {
+	var err error
+
+	if !d.force {
+		_, err = os.Stat(d.srcTgzAsc())
+
+		if os.IsNotExist(err) {
+			goto download
+		}
+		return os.Open(d.srcTgzAsc())
+	}
+
+	if d.force {
+		if err := os.Remove(d.srcTgzAsc()); err != nil && !os.IsNotExist(err) {
+			return nil, err
+		}
+	}
+
+download:
+	r := gorequest.New()
+	sa := r.Timeout(time.Duration(d.timeout) * time.Second)
+
+	sa.Get(d.SrcAscLink()).EndBytes(func(res gorequest.Response, body []byte, errs []error) {
+		if len(errs) != 0 {
+			err = errs[0]
+			return
+		}
+
+		if res.StatusCode != http.StatusOK {
+			err = fmt.Errorf("non-expected response status %s", res.Status)
+			return
+		}
+
+		if len(body) == 0 {
+			err = fmt.Errorf("response signature size zero")
+			return
+		}
+
+		err = os.WriteFile(d.srcTgzAsc(), body, 0644)
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	return os.Open(d.srcTgzAsc())
+}
+
 func (d *Dist) checksum(src []byte, body []byte) (bool, error) {
 	var err error
 
@@ -237,6 +353,54 @@ func (d *Dist) checksum(src []byte, body []byte) (bool, error) {
 	return ret == 0, nil
 }
 
+func (d *Dist) signature(src []byte, sign *os.File, key *os.File) error {
+	block, err := armor.Decode(sign)
+	if err != nil {
+		return err
+	}
+
+	if block.Type != "PGP SIGNATURE" {
+		return fmt.Errorf("not an armor signature")
+	}
+
+	pkg, err := packet.Read(block.Body)
+	if err != nil {
+		return err
+	}
+
+	signature, ok := pkg.(*packet.Signature)
+	if !ok {
+		return fmt.Errorf("not a valid signature file")
+	}
+
+	kblock, err := armor.Decode(key)
+	if err != nil {
+		return err
+	}
+
+	if kblock.Type != "PGP PUBLIC KEY BLOCK" {
+		return fmt.Errorf("not an armored public key")
+	}
+
+	kpkg, err := packet.Read(kblock.Body)
+	if err != nil {
+		return err
+	}
+
+	pubKey, ok := kpkg.(*packet.PublicKey)
+	if !ok {
+		return fmt.Errorf("not a valid public key file")
+	}
+
+	hash := signature.Hash.New()
+	_, err = hash.Write(src)
+	if err != nil {
+		return err
+	}
+
+	return pubKey.VerifySignature(hash, signature)
+}
+
 // ValidChecksum validate from sha512 checksum file
 func (d *Dist) ValidChecksum() (bool, error) {
 	if err := d.fetchSrc(); err != nil {
@@ -254,6 +418,29 @@ func (d *Dist) ValidChecksum() (bool, error) {
 	}
 
 	return d.checksum(src, checksum)
+}
+
+// ValidSignature validate from asc file
+func (d *Dist) ValidSignature() (bool, error) {
+	src, err := os.ReadFile(d.srcTgz())
+	if err != nil {
+		return false, err
+	}
+
+	sign, err := d.fetchSrcSignature()
+	if err != nil {
+		return false, err
+	}
+	defer sign.Close()
+
+	key, err := d.fetchKey()
+	if err != nil {
+		return false, err
+	}
+	defer key.Close()
+
+	err = d.signature(src, sign, key)
+	return err == nil, err
 }
 
 // NewDashboardDist dashboard dist
@@ -282,11 +469,20 @@ var dashboardCmd = &cobra.Command{
 func dashboardRun(cmd *cobra.Command, args []string) {
 	dist := NewDashboardDist()
 	dist.ValidAllLinks()
+
 	if ok, err := dist.ValidChecksum(); err != nil {
 		log.Fatalf("dist validate checksum failed: %s\n", err)
 	} else if ok {
-		log.Fatalln("dist validate checksum successfully")
+		log.Println("dist validate checksum successfully")
 	} else {
 		log.Fatalln("dist validate checksum failed")
+	}
+
+	if ok, err := dist.ValidSignature(); err != nil {
+		log.Fatalf("dist validate signature failed:%s", err)
+	} else if ok {
+		log.Println("dist validate signature successfully")
+	} else {
+		log.Fatalln("dist validate signature failed")
 	}
 }

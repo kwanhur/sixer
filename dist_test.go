@@ -15,7 +15,10 @@
 package main
 
 import (
+	"os"
 	"testing"
+
+	"github.com/ProtonMail/go-crypto/openpgp"
 )
 
 func TestDist_Validate(t *testing.T) {
@@ -93,4 +96,36 @@ func TestDist_downloadSrc(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestDist_publicKey(t *testing.T) {
+	key, err := os.Open("key")
+	if err != nil {
+		t.Error(err)
+	}
+	defer key.Close()
+
+	entities, err := openpgp.ReadArmoredKeyRing(key)
+	if err != nil {
+		t.Error(err)
+	}
+
+	if len(entities) != 1 {
+		t.Logf("key ring length should be one")
+		t.FailNow()
+	}
+
+	entity := entities[0]
+	if len(entity.Identities) != 1 {
+		t.Logf("identity should be one")
+		t.FailNow()
+	}
+
+	iden := entity.PrimaryIdentity()
+	t.Logf("%s", iden.Name)
+
+	pubKey := entity.PrimaryKey
+
+	t.Logf("%s", pubKey.KeyIdShortString())
+	t.Logf("%s", pubKey.KeyIdString())
 }
