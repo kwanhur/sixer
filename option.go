@@ -24,7 +24,6 @@ var (
 
 	candidate string
 	announcer string
-	force     bool
 	timeout   uint
 )
 
@@ -36,8 +35,7 @@ func BindVerFlags(flags *pflag.FlagSet) {
 
 // BindGlobalFlags bind persistent flags
 func BindGlobalFlags(flags *pflag.FlagSet) {
-	flags.BoolVarP(&force, "force", "F", false, "Force to cover existed files")
-	flags.UintVarP(&timeout, "timeout", "t", 0, "Specify request link timeout, unit second")
+	flags.UintVarP(&timeout, "timeout", "t", 0, "Specify request link timeout, unit: second")
 	flags.StringVarP(&candidate, "candidate", "c", "", "Specify apisix release candidate version,like 0.2.0")
 	flags.StringVarP(&announcer, "announcer", "a", "", "Specify apisix release candidate announcer")
 }

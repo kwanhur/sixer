@@ -44,7 +44,6 @@ const (
 type Dist struct {
 	Candidate
 	timeout   uint
-	force     bool // force recover existed packages
 	announcer string
 }
 
@@ -104,16 +103,10 @@ func (d *Dist) ValidAllLinks() error {
 }
 
 func (d *Dist) fetchSrcTgz() error {
-	if d.force {
-		if err := os.Remove(d.srcTgz()); err != nil && !os.IsNotExist(err) {
-			return err
-		}
-	} else {
-		if f, err := os.Stat(d.srcTgz()); err != nil && !os.IsNotExist(err) {
-			return err
-		} else if f != nil {
-			return nil
-		}
+	if f, err := os.Stat(d.srcTgz()); err != nil && !os.IsNotExist(err) {
+		return err
+	} else if f != nil {
+		return nil
 	}
 
 	var err error
@@ -146,25 +139,15 @@ func (d *Dist) fetchSrcTgz() error {
 	return err
 }
 
-func (d *Dist) fetchSrcChecksum() ([]byte, error) {
-	var checksum []byte
+func (d *Dist) fetchSrcTgzSha512() error {
 	var err error
 
-	if !d.force {
-		checksum, err = os.ReadFile(d.srcTgzSha512())
-
-		if os.IsNotExist(err) {
-			err = nil
-			goto download
-		}
-		return checksum, nil
+	_, err = os.Stat(d.srcTgzSha512())
+	if os.IsNotExist(err) {
+		err = nil
+		goto download
 	}
-
-	if d.force {
-		if err := os.Remove(d.srcTgzSha512()); err != nil && !os.IsNotExist(err) {
-			return nil, err
-		}
-	}
+	return nil
 
 download:
 	r := gorequest.New()
@@ -194,15 +177,9 @@ download:
 		if err != nil {
 			return
 		}
-
-		checksum = body
 	})
 
-	if err != nil {
-		return nil, err
-	}
-
-	return checksum, nil
+	return err
 }
 
 func (d *Dist) validKey() (bool, error) {
@@ -229,62 +206,47 @@ func (d *Dist) validKey() (bool, error) {
 	return strings.HasPrefix(id.Name, d.announcer), nil
 }
 
-func (d *Dist) fetchKey() (*os.File, error) {
+func (d *Dist) fetchKey() error {
 	if _, err := d.validAttrs(); err != nil {
-		return nil, err
+		return err
 	}
 
-	if d.force {
-		if err := os.Remove(keyFilename); err != nil && !os.IsNotExist(err) {
-			return nil, err
+	if _, err := os.Stat(keyFilename); err != nil {
+		if !os.IsNotExist(err) {
+			return err
 		}
+
 		goto export
 	} else {
-		if _, err := os.Stat(keyFilename); err != nil {
-			if !os.IsNotExist(err) {
-				return nil, err
-			}
-
+		if ok, err := d.validKey(); err != nil {
+			return err
+		} else if !ok {
 			goto export
-		} else {
-			if ok, err := d.validKey(); err != nil {
-				return nil, err
-			} else if !ok {
-				goto export
-			}
-			return os.Open(keyFilename)
 		}
+		return nil
 	}
 
 export:
 	cmd := exec.Command("gpg", "--armor", "--output", keyFilename, "--export", d.announcer)
 	if err := cmd.Run(); err != nil {
-		return nil, err
+		return err
 	}
 	if !cmd.ProcessState.Success() {
-		return nil, fmt.Errorf("gpg export %s keyfile failed", d.announcer)
+		return fmt.Errorf("gpg export %s keyfile failed", d.announcer)
 	}
 
-	return os.Open(keyFilename)
+	return nil
 }
 
-func (d *Dist) fetchSrcSignature() (*os.File, error) {
+func (d *Dist) fetchSrcTgzAsc() error {
 	var err error
 
-	if !d.force {
-		_, err = os.Stat(d.srcTgzAsc())
-
-		if os.IsNotExist(err) {
-			goto download
-		}
-		return os.Open(d.srcTgzAsc())
+	_, err = os.Stat(d.srcTgzAsc())
+	if os.IsNotExist(err) {
+		err = nil
+		goto download
 	}
-
-	if d.force {
-		if err := os.Remove(d.srcTgzAsc()); err != nil && !os.IsNotExist(err) {
-			return nil, err
-		}
-	}
+	return nil
 
 download:
 	r := gorequest.New()
@@ -313,11 +275,7 @@ download:
 		err = os.WriteFile(d.srcTgzAsc(), body, 0644)
 	})
 
-	if err != nil {
-		return nil, err
-	}
-
-	return os.Open(d.srcTgzAsc())
+	return err
 }
 
 func (d *Dist) checksum(src []byte, body []byte) (bool, error) {
@@ -394,7 +352,7 @@ func (d *Dist) signature(src []byte, sign *os.File, key *os.File) error {
 
 // ValidChecksum validate from sha512 checksum file
 func (d *Dist) ValidChecksum() (bool, error) {
-	checksum, err := d.fetchSrcChecksum()
+	checksum, err := os.ReadFile(d.srcTgzSha512())
 	if err != nil {
 		return false, err
 	}
@@ -414,13 +372,13 @@ func (d *Dist) ValidSignature() (bool, error) {
 		return false, err
 	}
 
-	sign, err := d.fetchSrcSignature()
+	sign, err := os.Open(d.srcTgzAsc())
 	if err != nil {
 		return false, err
 	}
 	defer sign.Close()
 
-	key, err := d.fetchKey()
+	key, err := os.Open(keyFilename)
 	if err != nil {
 		return false, err
 	}
@@ -430,7 +388,8 @@ func (d *Dist) ValidSignature() (bool, error) {
 	return err == nil, err
 }
 
-func (d *Dist) checkExtras() (bool, error) {
+// CheckExtras check LICENSE NOTICE exist or not
+func (d *Dist) CheckExtras() (bool, error) {
 	f, err := os.Open(d.srcTgz())
 	if err != nil {
 		return false, err
@@ -443,6 +402,9 @@ func (d *Dist) checkExtras() (bool, error) {
 	}
 	defer gzf.Close()
 
+	licFound := false // LICENSE
+	notFound := false // NOTICE
+
 	tf := tar.NewReader(gzf)
 	for {
 		hdr, err := tf.Next()
@@ -454,14 +416,48 @@ func (d *Dist) checkExtras() (bool, error) {
 		case tar.TypeReg:
 			switch hdr.Name {
 			case "./LICENSE":
+				licFound = true
 				log.Println("LICENSE ok ✅")
 			case "./NOTICE":
+				notFound = true
 				log.Println("NOTICE ok ✅")
 			}
 		}
 	}
 
+	if !licFound {
+		log.Println("LICENSE bad ❌")
+	}
+	if !notFound {
+		log.Println("NOTICE bad ❌")
+	}
+
 	return true, nil
+}
+
+// Fetch export key and fetch package files
+func (d *Dist) Fetch() error {
+	if err := d.fetchKey(); err != nil {
+		log.Printf("dist fetch key bad ❌ %s\n", err)
+		return err
+	}
+
+	if err := d.fetchSrcTgz(); err != nil {
+		log.Printf("dist fetch src tgz bad ❌ %s\n", err)
+		return err
+	}
+
+	if err := d.fetchSrcTgzSha512(); err != nil {
+		log.Printf("dist fetch src tgz sha512 bad ❌ %s\n", err)
+		return err
+	}
+
+	if err := d.fetchSrcTgzAsc(); err != nil {
+		log.Printf("dist fetch src tgz asc bad ❌ %s\n", err)
+		return err
+	}
+
+	return nil
 }
 
 // Clean cleans download files
@@ -491,39 +487,58 @@ func (d *Dist) Clean() error {
 // 3. verify checksum and signature
 // 4. untar then check LICENSE and NOTICE
 func (d *Dist) Verify() {
-	if err := d.fetchSrcTgz(); err != nil {
-		log.Printf("dist fetch src tgz bad❌:%s\n", err)
-	}
-
 	if ok, err := d.ValidChecksum(); err != nil {
-		log.Printf("dist validate checksum bad❌: %s\n", err)
+		log.Printf("dist validate checksum bad ❌ %s\n", err)
 	} else if ok {
-		log.Println("dist validate checksum ok✅")
+		log.Println("dist validate checksum ok ✅")
 	} else {
-		log.Println("dist validate checksum bad❌")
+		log.Println("dist validate checksum bad ❌")
 	}
 
 	if ok, err := d.ValidSignature(); err != nil {
-		log.Printf("dist validate signature bad❌:%s", err)
+		log.Printf("dist validate signature bad ❌ %s", err)
 	} else if ok {
-		log.Println("dist validate signature ok✅")
+		log.Println("dist validate signature ok ✅")
 	} else {
-		log.Println("dist validate signature bad❌")
+		log.Println("dist validate signature bad ❌")
 	}
 
-	if _, err := d.checkExtras(); err != nil {
-		log.Printf("dist check extras bad❌:%s\n", err)
+	if _, err := d.CheckExtras(); err != nil {
+		log.Printf("dist check extras bad ❌ %s\n", err)
 	}
 }
 
+func dist(name string) *Dist {
+	var dist *Dist
+	switch name {
+	case "dashboard":
+		dist = NewDashboardDist()
+	default:
+		dist = nil
+	}
+
+	return dist
+}
+
+var loaderCmd = &cobra.Command{
+	Use:   "load",
+	Short: "download package files",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		if dist := dist(cmd.Parent().Name()); dist != nil {
+			return dist.Fetch()
+		}
+
+		return fmt.Errorf("subcommand load unsupported")
+	},
+}
+
 // NewDashboardDist dashboard dist
-func NewDashboardDist() Dist {
-	return Dist{
+func NewDashboardDist() *Dist {
+	return &Dist{
 		Candidate: Candidate{
 			pkg: "dashboard",
 			rc:  candidate,
 		},
-		force:     force,
 		announcer: announcer,
 		timeout:   timeout,
 	}
@@ -537,12 +552,21 @@ var dashboardCmd = &cobra.Command{
 		dist := NewDashboardDist()
 		return dist.ValidAllLinks()
 	},
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		dist := NewDashboardDist()
+		if err := dist.Fetch(); err != nil {
+			return err
+		}
+
 		dist.Verify()
+		return nil
 	},
 	PostRunE: func(cmd *cobra.Command, args []string) error {
 		dist := NewDashboardDist()
 		return dist.Clean()
 	},
+}
+
+func init() {
+	dashboardCmd.AddCommand(loaderCmd)
 }

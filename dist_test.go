@@ -26,7 +26,7 @@ func TestDist_Validate(t *testing.T) {
 
 	tests := []struct {
 		name string
-		dist Dist
+		dist *Dist
 	}{
 		{
 			name: "test dashboard legal rc",
@@ -45,7 +45,7 @@ func TestDist_Validate2(t *testing.T) {
 
 	tests := []struct {
 		name string
-		dist Dist
+		dist *Dist
 	}{
 		{
 			name: "test dashboard illegal rc",
@@ -77,12 +77,11 @@ func TestDist_ValidChecksum(t *testing.T) {
 
 func TestDist_downloadSrc(t *testing.T) {
 	candidate = "2.11.0"
-	force = true
 	//timeout = 3
 
 	tests := []struct {
 		name    string
-		dist    Dist
+		dist    *Dist
 		wantErr bool
 	}{
 		{
@@ -137,11 +136,10 @@ func TestDist_fetchKey(t *testing.T) {
 	dist := NewDashboardDist()
 	dist.announcer = "kwanhur"
 
-	f, err := dist.fetchKey()
+	err := dist.fetchKey()
 	if err != nil {
 		t.Error(err)
 	}
-	f.Close()
 }
 
 func TestDist_validKey(t *testing.T) {
@@ -173,7 +171,7 @@ func TestDist_checkExtras(t *testing.T) {
 	dist := NewDashboardDist()
 	dist.rc = "2.11.0"
 
-	if _, err := dist.checkExtras(); err != nil {
+	if _, err := dist.CheckExtras(); err != nil {
 		t.Error(err)
 	}
 }
