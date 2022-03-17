@@ -90,12 +90,12 @@ func (d *Dist) ValidAllLinks() error {
 	links := []string{d.PackageLink(), d.SrcLink(), d.SrcAscLink(), d.SrcSha512Link()}
 	for _, link := range links {
 		if ok, err := d.validLink(link); err != nil {
-			log.Printf("dist %s validate bad❌:%s\n", link, err)
+			log.Printf("dist %s validate bad ❌ %s\n", link, err)
 			return err
 		} else if ok {
-			log.Printf("dist %s validate ok✅\n", link)
+			log.Printf("dist %s validate ok ✅\n", link)
 		} else {
-			log.Printf("dist %s validate bad❌\n", link)
+			log.Printf("dist %s validate bad ❌\n", link)
 		}
 	}
 
