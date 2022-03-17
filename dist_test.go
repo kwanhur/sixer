@@ -22,7 +22,7 @@ import (
 )
 
 func TestDist_Validate(t *testing.T) {
-	ReleaseCandidate = "2.11.0"
+	candidate = "2.11.0"
 
 	tests := []struct {
 		name string
@@ -41,7 +41,7 @@ func TestDist_Validate(t *testing.T) {
 }
 
 func TestDist_Validate2(t *testing.T) {
-	ReleaseCandidate = "2.11.1"
+	candidate = "2.11.1"
 
 	tests := []struct {
 		name string
@@ -62,7 +62,7 @@ func TestDist_Validate2(t *testing.T) {
 }
 
 func TestDist_ValidChecksum(t *testing.T) {
-	ReleaseCandidate = "2.11.0"
+	candidate = "2.11.0"
 
 	dist := NewDashboardDist()
 	ok, err := dist.ValidChecksum()
@@ -76,7 +76,10 @@ func TestDist_ValidChecksum(t *testing.T) {
 }
 
 func TestDist_downloadSrc(t *testing.T) {
-	ReleaseCandidate = "2.11.0"
+	candidate = "2.11.0"
+	force = true
+	//timeout = 3
+
 	tests := []struct {
 		name    string
 		dist    Dist
@@ -90,9 +93,9 @@ func TestDist_downloadSrc(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			tt.dist.SetTimeout(10)
-			if err := tt.dist.fetchSrc(); (err != nil) != tt.wantErr {
-				t.Errorf("fetchSrc() error = %v, wantErr %v", err, tt.wantErr)
+			//tt.dist.SetTimeout(10)
+			if err := tt.dist.fetchSrcTgz(); (err != nil) != tt.wantErr {
+				t.Errorf("fetchSrcTgz() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
 	}
@@ -128,4 +131,40 @@ func TestDist_publicKey(t *testing.T) {
 
 	t.Logf("%s", pubKey.KeyIdShortString())
 	t.Logf("%s", pubKey.KeyIdString())
+}
+
+func TestDist_fetchKey(t *testing.T) {
+	dist := NewDashboardDist()
+	dist.announcer = "kwanhur"
+
+	f, err := dist.fetchKey()
+	if err != nil {
+		t.Error(err)
+	}
+	f.Close()
+}
+
+func TestDist_validKey(t *testing.T) {
+	dist := NewDashboardDist()
+	dist.announcer = "kwanhur"
+
+	ok, err := dist.validKey()
+	if err != nil {
+		t.Error(err)
+	}
+
+	if !ok {
+		t.Logf("announcer %s valid key fail", dist.announcer)
+		t.FailNow()
+	}
+
+	dist.announcer = "Zeping Bai"
+	ok, err = dist.validKey()
+	if err != nil {
+		t.Error(err)
+	}
+
+	if !ok {
+		t.Logf("announcer %s valid expect fail ok", dist.announcer)
+	}
 }

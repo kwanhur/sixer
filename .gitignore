@@ -31,3 +31,6 @@
 .idea
 
 apisixer
+
+.key
+*-src.tgz*

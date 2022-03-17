@@ -17,10 +17,16 @@ package main
 import "github.com/spf13/pflag"
 
 var (
+	// Version marked to show version
 	Version bool
+	// Verbose marked to show verbose
 	Verbose bool
 
-	ReleaseCandidate string
+	candidate string
+	announcer string
+	force     bool
+	clean     bool
+	timeout   uint
 )
 
 // BindVerFlags add Version Verbose flags
@@ -29,6 +35,11 @@ func BindVerFlags(flags *pflag.FlagSet) {
 	flags.BoolVarP(&Verbose, "verbose", "V", false, "Show apisixer's verbose information")
 }
 
-func BindRCFlag(flag *pflag.FlagSet) {
-	flag.StringVarP(&ReleaseCandidate, "release-candidate", "r", "", "Specify apisix release candidate version,like 0.2.0")
+// BindGlobalFlags bind persistent flags
+func BindGlobalFlags(flags *pflag.FlagSet) {
+	flags.BoolVarP(&clean, "clean", "c", false, "Clean files")
+	flags.BoolVarP(&force, "force", "f", false, "Force to cover existed files")
+	flags.UintVarP(&timeout, "timeout", "t", 0, "Specify request link timeout, unit second")
+	flags.StringVarP(&candidate, "candidate", "c", "", "Specify apisix release candidate version,like 0.2.0")
+	flags.StringVarP(&announcer, "announcer", "a", "", "Specify apisix release candidate announcer")
 }

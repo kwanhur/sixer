@@ -35,14 +35,17 @@ func init() {
 
 func init() {
 	globals := sixer.PersistentFlags()
-	BindRCFlag(globals)
+	BindGlobalFlags(globals)
 
 	BindVerFlags(sixer.Flags())
 }
 
 func sixerPreRun(cmd *cobra.Command, args []string) {
-	if ReleaseCandidate == "" {
-		log.Fatalln("Please specify release candidate version first.")
+	if candidate == "" {
+		log.Fatalln("Please specify release candidate version first")
+	}
+	if announcer == "" {
+		log.Fatalln("Please specify release announcer")
 	}
 }
 

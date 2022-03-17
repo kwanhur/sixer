@@ -34,75 +34,29 @@ import (
 )
 
 const (
-	baseLink    = "https://dist.apache.org/repos/dist/dev/apisix/"
-	pkgPrefix   = "apisix"
-	pkgPrefix2  = "apache-apisix"
 	keyFilename = ".key"
 )
-
-// A Candidate represents package with specified version
-type Candidate struct {
-	pkg string // package name, like: dashboard
-	rc  string // release candidate version, like: 0.2.0
-}
-
-// PackageLink complete URL for package directory
-func (c *Candidate) PackageLink() string {
-	return fmt.Sprintf("%s%s", baseLink, c.Package())
-}
-
-// Package a package name with prefix "apisix"
-func (c *Candidate) Package() string {
-	return fmt.Sprintf("%s-%s-%s", pkgPrefix, c.pkg, c.rc)
-}
-
-// Package2 a package name with prefix "apache-apisix"
-func (c *Candidate) Package2() string {
-	return fmt.Sprintf("%s-%s-%s", pkgPrefix2, c.pkg, c.rc)
-}
-
-func (c *Candidate) srcTgz() string {
-	return fmt.Sprintf("%s-src.tgz", c.Package2())
-}
-
-// SrcLink source package URL
-func (c *Candidate) SrcLink() string {
-	return fmt.Sprintf("%s/%s", c.PackageLink(), c.srcTgz())
-}
-
-func (c *Candidate) srcTgzAsc() string {
-	return fmt.Sprintf("%s-src.tgz.asc", c.Package2())
-}
-
-// SrcAscLink source package asc URL
-func (c *Candidate) SrcAscLink() string {
-	return fmt.Sprintf("%s/%s", c.PackageLink(), c.srcTgzAsc())
-}
-
-func (c *Candidate) srcTgzSha512() string {
-	return fmt.Sprintf("%s-src.tgz.sha512", c.Package2())
-}
-
-// SrcSha512Link source package sha512 URL
-func (c *Candidate) SrcSha512Link() string {
-	return fmt.Sprintf("%s/%s", c.PackageLink(), c.srcTgzSha512())
-}
 
 // A Dist repo include package and its asc sha512
 type Dist struct {
 	Candidate
-	timeout   int
+	timeout   uint
 	force     bool // force recover existed packages
+	clean     bool
 	announcer string
 }
 
-// SetTimeout set dist request timeout, unit second
-func (d *Dist) SetTimeout(t int) {
-	d.timeout = t
+func (d *Dist) validAttrs() (bool, error) {
+	if d.announcer == "" {
+		return false, fmt.Errorf("announcer not specified")
+	}
+
+	return true, nil
 }
 
-func (d *Dist) keysLink() string {
-	return fmt.Sprintf("%s%s", baseLink, "KEYS")
+// SetTimeout set dist request timeout, unit second
+func (d *Dist) SetTimeout(t uint) {
+	d.timeout = t
 }
 
 func (d *Dist) validLink(link string) (bool, error) {
@@ -113,8 +67,12 @@ func (d *Dist) validLink(link string) (bool, error) {
 	sa := r.Timeout(time.Duration(d.timeout) * time.Second)
 
 	sa.Head(link).End(func(res gorequest.Response, body string, errs []error) {
-		if len(errs) != 0 {
-			err = errs[0]
+		for _, e := range errs {
+			if e != nil {
+				err = e
+			}
+		}
+		if err != nil {
 			return
 		}
 
@@ -140,7 +98,7 @@ func (d *Dist) ValidAllLinks() {
 	}
 }
 
-func (d *Dist) fetchSrc() error {
+func (d *Dist) fetchSrcTgz() error {
 	if d.force {
 		if err := os.Remove(d.srcTgz()); err != nil && !os.IsNotExist(err) {
 			return err
@@ -158,8 +116,12 @@ func (d *Dist) fetchSrc() error {
 	sa := r.Timeout(time.Duration(d.timeout) * time.Second)
 
 	sa.Get(d.SrcLink()).EndBytes(func(res gorequest.Response, body []byte, errs []error) {
-		if len(errs) != 0 {
-			err = errs[0]
+		for _, e := range errs {
+			if e != nil {
+				err = e
+			}
+		}
+		if err != nil {
 			return
 		}
 
@@ -203,8 +165,12 @@ download:
 	sa := r.Timeout(time.Duration(d.timeout) * time.Second)
 
 	sa.Get(d.SrcSha512Link()).EndBytes(func(res gorequest.Response, body []byte, errs []error) {
-		if len(errs) != 0 {
-			err = errs[0]
+		for _, e := range errs {
+			if e != nil {
+				err = e
+			}
+		}
+		if err != nil {
 			return
 		}
 
@@ -236,7 +202,7 @@ func (d *Dist) validKey() (bool, error) {
 		return false, err
 	}
 
-	if len(entities) != 0 {
+	if len(entities) != 1 {
 		return false, fmt.Errorf("should be one entity in key")
 	}
 
@@ -249,15 +215,21 @@ func (d *Dist) validKey() (bool, error) {
 }
 
 func (d *Dist) fetchKey() (*os.File, error) {
+	if _, err := d.validAttrs(); err != nil {
+		return nil, err
+	}
+
 	if d.force {
 		if err := os.Remove(keyFilename); err != nil && !os.IsNotExist(err) {
 			return nil, err
 		}
 		goto export
 	} else {
-		if _, err := os.Stat(keyFilename); err != nil && !os.IsNotExist(err) {
-			return nil, err
-		} else if os.IsNotExist(err) {
+		if _, err := os.Stat(keyFilename); err != nil {
+			if !os.IsNotExist(err) {
+				return nil, err
+			}
+
 			goto export
 		} else {
 			if ok, err := d.validKey(); err != nil {
@@ -270,7 +242,7 @@ func (d *Dist) fetchKey() (*os.File, error) {
 	}
 
 export:
-	cmd := exec.Command("gpg", "--export", d.announcer, "--output", keyFilename)
+	cmd := exec.Command("gpg", "--armor", "--output", keyFilename, "--export", d.announcer)
 	if err := cmd.Run(); err != nil {
 		return nil, err
 	}
@@ -304,8 +276,12 @@ download:
 	sa := r.Timeout(time.Duration(d.timeout) * time.Second)
 
 	sa.Get(d.SrcAscLink()).EndBytes(func(res gorequest.Response, body []byte, errs []error) {
-		if len(errs) != 0 {
-			err = errs[0]
+		for _, e := range errs {
+			if e != nil {
+				err = e
+			}
+		}
+		if err != nil {
 			return
 		}
 
@@ -403,10 +379,6 @@ func (d *Dist) signature(src []byte, sign *os.File, key *os.File) error {
 
 // ValidChecksum validate from sha512 checksum file
 func (d *Dist) ValidChecksum() (bool, error) {
-	if err := d.fetchSrc(); err != nil {
-		return false, err
-	}
-
 	checksum, err := d.fetchSrcChecksum()
 	if err != nil {
 		return false, err
@@ -443,34 +415,36 @@ func (d *Dist) ValidSignature() (bool, error) {
 	return err == nil, err
 }
 
-// NewDashboardDist dashboard dist
-func NewDashboardDist() Dist {
-	return Dist{
-		Candidate: Candidate{
-			pkg: "dashboard",
-			rc:  ReleaseCandidate,
-		},
-		timeout: 3,
+// Clean cleans download files
+func (d *Dist) Clean() error {
+	if !d.clean {
+		return nil
 	}
+
+	if err := os.Remove(d.srcTgzAsc()); err != nil && !os.IsNotExist(err) {
+		return err
+	}
+
+	if err := os.Remove(d.srcTgz()); err != nil && !os.IsNotExist(err) {
+		return err
+	}
+
+	return nil
 }
 
-var dashboardCmd = &cobra.Command{
-	Use:              "dashboard",
-	Short:            "apisix dashboard package verifier",
-	PersistentPreRun: sixerPreRun,
-	Run:              dashboardRun,
-}
-
-// verify package
+// Verify package
 // 1. check links
 // 2. download packages
 // 3. verify checksum and signature
 // 4. untar then check LICENSE and NOTICE
-func dashboardRun(cmd *cobra.Command, args []string) {
-	dist := NewDashboardDist()
-	dist.ValidAllLinks()
+func (d *Dist) Verify() {
+	d.ValidAllLinks()
 
-	if ok, err := dist.ValidChecksum(); err != nil {
+	if err := d.fetchSrcTgz(); err != nil {
+		log.Fatalf("dist fetch src tgz failed:%s\n", err)
+	}
+
+	if ok, err := d.ValidChecksum(); err != nil {
 		log.Fatalf("dist validate checksum failed: %s\n", err)
 	} else if ok {
 		log.Println("dist validate checksum successfully")
@@ -478,11 +452,38 @@ func dashboardRun(cmd *cobra.Command, args []string) {
 		log.Fatalln("dist validate checksum failed")
 	}
 
-	if ok, err := dist.ValidSignature(); err != nil {
+	if ok, err := d.ValidSignature(); err != nil {
 		log.Fatalf("dist validate signature failed:%s", err)
 	} else if ok {
 		log.Println("dist validate signature successfully")
 	} else {
 		log.Fatalln("dist validate signature failed")
 	}
+
+	if err := d.Clean(); err != nil {
+		log.Printf("clean files failed:%s\n", err)
+	}
+}
+
+// NewDashboardDist dashboard dist
+func NewDashboardDist() Dist {
+	return Dist{
+		Candidate: Candidate{
+			pkg: "dashboard",
+			rc:  candidate,
+		},
+		force:     force,
+		announcer: announcer,
+		timeout:   timeout,
+	}
+}
+
+var dashboardCmd = &cobra.Command{
+	Use:              "dashboard",
+	Short:            "apisix dashboard package verifier",
+	PersistentPreRun: sixerPreRun,
+	Run: func(cmd *cobra.Command, args []string) {
+		dist := NewDashboardDist()
+		dist.Verify()
+	},
 }
