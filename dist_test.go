@@ -168,3 +168,12 @@ func TestDist_validKey(t *testing.T) {
 		t.Logf("announcer %s valid expect fail ok", dist.announcer)
 	}
 }
+
+func TestDist_checkExtras(t *testing.T) {
+	dist := NewDashboardDist()
+	dist.rc = "2.11.0"
+
+	if _, err := dist.checkExtras(); err != nil {
+		t.Error(err)
+	}
+}

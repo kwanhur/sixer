@@ -15,9 +15,12 @@
 package main
 
 import (
+	"archive/tar"
 	"bytes"
+	"compress/gzip"
 	"crypto/sha512"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"os"
@@ -42,7 +45,6 @@ type Dist struct {
 	Candidate
 	timeout   uint
 	force     bool // force recover existed packages
-	clean     bool
 	announcer string
 }
 
@@ -85,17 +87,20 @@ func (d *Dist) validLink(link string) (bool, error) {
 }
 
 // ValidAllLinks validate URL links, include package and its src asc sha512
-func (d *Dist) ValidAllLinks() {
+func (d *Dist) ValidAllLinks() error {
 	links := []string{d.PackageLink(), d.SrcLink(), d.SrcAscLink(), d.SrcSha512Link()}
 	for _, link := range links {
 		if ok, err := d.validLink(link); err != nil {
-			log.Fatalf("dist %s validate failed:%s\n", link, err)
+			log.Printf("dist %s validate bad❌:%s\n", link, err)
+			return err
 		} else if ok {
-			log.Printf("dist %s validate successfully\n", link)
+			log.Printf("dist %s validate ok✅\n", link)
 		} else {
-			log.Printf("dist %s validate failed\n", link)
+			log.Printf("dist %s validate bad❌\n", link)
 		}
 	}
+
+	return nil
 }
 
 func (d *Dist) fetchSrcTgz() error {
@@ -149,6 +154,7 @@ func (d *Dist) fetchSrcChecksum() ([]byte, error) {
 		checksum, err = os.ReadFile(d.srcTgzSha512())
 
 		if os.IsNotExist(err) {
+			err = nil
 			goto download
 		}
 		return checksum, nil
@@ -184,8 +190,17 @@ download:
 			return
 		}
 
+		err = os.WriteFile(d.srcTgzSha512(), body, 0644)
+		if err != nil {
+			return
+		}
+
 		checksum = body
 	})
+
+	if err != nil {
+		return nil, err
+	}
 
 	return checksum, nil
 }
@@ -415,10 +430,44 @@ func (d *Dist) ValidSignature() (bool, error) {
 	return err == nil, err
 }
 
+func (d *Dist) checkExtras() (bool, error) {
+	f, err := os.Open(d.srcTgz())
+	if err != nil {
+		return false, err
+	}
+	defer f.Close()
+
+	gzf, err := gzip.NewReader(f)
+	if err != nil {
+		return false, err
+	}
+	defer gzf.Close()
+
+	tf := tar.NewReader(gzf)
+	for {
+		hdr, err := tf.Next()
+		if err == io.EOF {
+			break
+		}
+
+		switch hdr.Typeflag {
+		case tar.TypeReg:
+			switch hdr.Name {
+			case "./LICENSE":
+				log.Println("LICENSE ok ✅")
+			case "./NOTICE":
+				log.Println("NOTICE ok ✅")
+			}
+		}
+	}
+
+	return true, nil
+}
+
 // Clean cleans download files
 func (d *Dist) Clean() error {
-	if !d.clean {
-		return nil
+	if err := os.Remove(d.srcTgzSha512()); err != nil && !os.IsNotExist(err) {
+		return err
 	}
 
 	if err := os.Remove(d.srcTgzAsc()); err != nil && !os.IsNotExist(err) {
@@ -426,6 +475,10 @@ func (d *Dist) Clean() error {
 	}
 
 	if err := os.Remove(d.srcTgz()); err != nil && !os.IsNotExist(err) {
+		return err
+	}
+
+	if err := os.Remove(keyFilename); err != nil && !os.IsNotExist(err) {
 		return err
 	}
 
@@ -438,30 +491,28 @@ func (d *Dist) Clean() error {
 // 3. verify checksum and signature
 // 4. untar then check LICENSE and NOTICE
 func (d *Dist) Verify() {
-	d.ValidAllLinks()
-
 	if err := d.fetchSrcTgz(); err != nil {
-		log.Fatalf("dist fetch src tgz failed:%s\n", err)
+		log.Printf("dist fetch src tgz bad❌:%s\n", err)
 	}
 
 	if ok, err := d.ValidChecksum(); err != nil {
-		log.Fatalf("dist validate checksum failed: %s\n", err)
+		log.Printf("dist validate checksum bad❌: %s\n", err)
 	} else if ok {
-		log.Println("dist validate checksum successfully")
+		log.Println("dist validate checksum ok✅")
 	} else {
-		log.Fatalln("dist validate checksum failed")
+		log.Println("dist validate checksum bad❌")
 	}
 
 	if ok, err := d.ValidSignature(); err != nil {
-		log.Fatalf("dist validate signature failed:%s", err)
+		log.Printf("dist validate signature bad❌:%s", err)
 	} else if ok {
-		log.Println("dist validate signature successfully")
+		log.Println("dist validate signature ok✅")
 	} else {
-		log.Fatalln("dist validate signature failed")
+		log.Println("dist validate signature bad❌")
 	}
 
-	if err := d.Clean(); err != nil {
-		log.Printf("clean files failed:%s\n", err)
+	if _, err := d.checkExtras(); err != nil {
+		log.Printf("dist check extras bad❌:%s\n", err)
 	}
 }
 
@@ -482,8 +533,16 @@ var dashboardCmd = &cobra.Command{
 	Use:              "dashboard",
 	Short:            "apisix dashboard package verifier",
 	PersistentPreRun: sixerPreRun,
+	PreRunE: func(cmd *cobra.Command, args []string) error {
+		dist := NewDashboardDist()
+		return dist.ValidAllLinks()
+	},
 	Run: func(cmd *cobra.Command, args []string) {
 		dist := NewDashboardDist()
 		dist.Verify()
+	},
+	PostRunE: func(cmd *cobra.Command, args []string) error {
+		dist := NewDashboardDist()
+		return dist.Clean()
 	},
 }
