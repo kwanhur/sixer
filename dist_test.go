@@ -35,7 +35,9 @@ func TestDist_Validate(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			tt.dist.ValidAllLinks()
+			if err := tt.dist.ValidAllLinks(); err != nil {
+				t.Error(err)
+			}
 		})
 	}
 }
@@ -55,7 +57,9 @@ func TestDist_Validate2(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Run(tt.name, func(t *testing.T) {
-				tt.dist.ValidAllLinks()
+				if err := tt.dist.ValidAllLinks(); err != nil {
+					t.Error(err)
+				}
 			})
 		})
 	}

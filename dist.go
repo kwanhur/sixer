@@ -43,7 +43,7 @@ const (
 // A Dist repo include package and its asc sha512
 type Dist struct {
 	Candidate
-	timeout   uint
+	Linker
 	announcer string
 }
 
@@ -55,41 +55,11 @@ func (d *Dist) validAttrs() (bool, error) {
 	return true, nil
 }
 
-// SetTimeout set dist request timeout, unit second
-func (d *Dist) SetTimeout(t uint) {
-	d.timeout = t
-}
-
-func (d *Dist) validLink(link string) (bool, error) {
-	var valid bool
-	var err error
-
-	r := gorequest.New()
-	sa := r.Timeout(time.Duration(d.timeout) * time.Second)
-
-	sa.Head(link).End(func(res gorequest.Response, body string, errs []error) {
-		for _, e := range errs {
-			if e != nil {
-				err = e
-			}
-		}
-		if err != nil {
-			return
-		}
-
-		if res.StatusCode == http.StatusOK {
-			valid = true
-		}
-	})
-
-	return valid, err
-}
-
 // ValidAllLinks validate URL links, include package and its src asc sha512
 func (d *Dist) ValidAllLinks() error {
 	links := []string{d.PackageLink(), d.SrcLink(), d.SrcAscLink(), d.SrcSha512Link()}
 	for _, link := range links {
-		if ok, err := d.validLink(link); err != nil {
+		if ok, err := d.Linker.Head(link); err != nil {
 			log.Printf("dist %s validate bad ❌ %s\n", link, err)
 			return err
 		} else if ok {
@@ -540,7 +510,9 @@ func NewDashboardDist() *Dist {
 			rc:  candidate,
 		},
 		announcer: announcer,
-		timeout:   timeout,
+		Linker: Linker{
+			timeout: timeout,
+		},
 	}
 }
 
