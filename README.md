@@ -21,6 +21,13 @@
 
 An Apache project repository package verifier.
 
+## Badges
+
+[![Software License](https://img.shields.io/badge/license-Apache2.0-brightgreen.svg?style=for-the-badge)](LICENSE)
+[![Powered By: KWANHUR](https://img.shields.io/badge/powered%20by-kwanhur-green.svg?style=for-the-badge)](https://github.com/kwanhur)
+[![Conventional Commits](https://img.shields.io/badge/Conventional%20Commits-1.0.0-yellow.svg?style=for-the-badge)](https://conventionalcommits.org)
+[![pre-commit](https://img.shields.io/badge/pre--commit-enabled-brightgreen?logo=pre-commit&logoColor=white)](https://github.com/pre-commit/pre-commit)
+
 ## Synopsis
 
 ```shell
