@@ -38,6 +38,8 @@ import (
 
 const (
 	keyFilename = ".key"
+
+	pkgApisixDashboard = "apisix-dashboard"
 )
 
 // A Dist repo include package and its asc sha512
@@ -45,6 +47,8 @@ type Dist struct {
 	Candidate
 	Linker
 	announcer string
+	repo      string
+	commit    string
 }
 
 func (d *Dist) validAttrs() (bool, error) {
@@ -57,6 +61,17 @@ func (d *Dist) validAttrs() (bool, error) {
 
 // ValidAllLinks validate URL links, include package and its src asc sha512
 func (d *Dist) ValidAllLinks() error {
+	git := &Git{
+		Repo:    d.repo,
+		Commit:  d.commit,
+		Release: d.rc,
+	}
+
+	github, _ := NewGitHub(git)
+	if err := github.ValidLinks(); err != nil {
+		return err
+	}
+
 	links := []string{d.PackageLink(), d.SrcLink(), d.SrcAscLink(), d.SrcSha512Link()}
 	for _, link := range links {
 		if ok, err := d.Linker.Head(link); err != nil {
@@ -506,10 +521,12 @@ var loaderCmd = &cobra.Command{
 func NewDashboardDist() *Dist {
 	return &Dist{
 		Candidate: Candidate{
-			pkg: "dashboard",
+			pkg: pkgApisixDashboard,
 			rc:  candidate,
 		},
 		announcer: announcer,
+		repo:      pkgApisixDashboard,
+		commit:    commitID,
 		Linker: Linker{
 			timeout: timeout,
 		},

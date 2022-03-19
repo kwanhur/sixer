@@ -18,13 +18,12 @@ import "fmt"
 
 const (
 	baseLink   = "https://dist.apache.org/repos/dist/dev/apisix/"
-	pkgPrefix  = "apisix"
-	pkgPrefix2 = "apache-apisix"
+	pkgPrefix2 = "apache"
 )
 
 // A Candidate represents package with specified version
 type Candidate struct {
-	pkg string // package name, like: dashboard
+	pkg string // package name, like: apisix-dashboard
 	rc  string // release candidate version, like: 0.2.0
 }
 
@@ -35,7 +34,7 @@ func (c *Candidate) PackageLink() string {
 
 // Package a package name with prefix "apisix"
 func (c *Candidate) Package() string {
-	return fmt.Sprintf("%s-%s-%s", pkgPrefix, c.pkg, c.rc)
+	return fmt.Sprintf("%s-%s", c.pkg, c.rc)
 }
 
 // Package2 a package name with prefix "apache-apisix"

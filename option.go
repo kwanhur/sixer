@@ -23,6 +23,7 @@ var (
 	Verbose bool
 
 	candidate string
+	commitID  string
 	announcer string
 	timeout   uint
 )
@@ -36,6 +37,7 @@ func BindVerFlags(flags *pflag.FlagSet) {
 // BindGlobalFlags bind persistent flags
 func BindGlobalFlags(flags *pflag.FlagSet) {
 	flags.UintVarP(&timeout, "timeout", "t", 0, "Specify request link timeout, unit: second")
-	flags.StringVarP(&candidate, "candidate", "c", "", "Specify apisix release candidate version,like 0.2.0")
-	flags.StringVarP(&announcer, "announcer", "a", "", "Specify apisix release candidate announcer")
+	flags.StringVarP(&candidate, "candidate", "c", "", "Specify release candidate version,like 0.2.0")
+	flags.StringVarP(&announcer, "announcer", "a", "", "Specify release candidate announcer")
+	flags.StringVarP(&commitID, "commit", "C", "", "Specify release commit id")
 }
