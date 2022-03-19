@@ -60,7 +60,7 @@ Use "sixer [command] --help" for more information about a command.
 ### Example
 
 ```shell
-./sixer dashboard -a "Zeping Bai" -c 2.11.0 -C 2c563dc15c54a8deb3ba08707594d4d15da76b1b 
+./sixer dashboard -a "Zeping Bai" -c 2.11.0 -C 2c563dc15c54a8deb3ba08707594d4d15da76b1b
 2022/03/19 16:56:04 github https://github.com/apache/apisix-dashboard/blob/release/2.11/CHANGELOG.md#2110 validate ok ✅
 2022/03/19 16:56:05 github https://github.com/apache/apisix-dashboard/commit/2c563dc15c54a8deb3ba08707594d4d15da76b1b validate ok ✅
 2022/03/19 16:56:08 dist https://dist.apache.org/repos/dist/dev/apisix/apisix-dashboard-2.11.0 validate ok ✅
