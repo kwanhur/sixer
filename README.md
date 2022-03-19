@@ -14,13 +14,13 @@
   ~ limitations under the License.
   ~
 -->
-# apisixer
-An Apache APISIX package verifier
+## Name
+An Apache project repository package verifier.
 
 ## Synopsis
 
 ```shell
-apisixer verify --dist dist-url
+sixer 
 
 []+/- [1|0] no-binding
 checked list:
@@ -30,6 +30,7 @@ checked list:
 ```
 
 ## TODO
-- [ ] download materials from dist
-- [ ] verify checksum and signature
-- [ ] check license and notice
+- [x] verfiy github links
+- [x] download materials from dist
+- [x] verify checksum and signature
+- [x] check license and notice

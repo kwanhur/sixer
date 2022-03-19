@@ -30,8 +30,8 @@ var (
 
 // BindVerFlags add Version Verbose flags
 func BindVerFlags(flags *pflag.FlagSet) {
-	flags.BoolVarP(&Version, "version", "v", false, "Show apisixer's version number")
-	flags.BoolVarP(&Verbose, "verbose", "V", false, "Show apisixer's verbose information")
+	flags.BoolVarP(&Version, "version", "v", false, "Show sixer version number")
+	flags.BoolVarP(&Verbose, "verbose", "V", false, "Show sixer verbose information")
 }
 
 // BindGlobalFlags bind persistent flags

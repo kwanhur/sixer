@@ -74,7 +74,7 @@ all: compile
 # make compile, go build
 compile: build
 build:
-	$(GOBUILD) -ldflags "-X main.commit=$(COMMIT)"
+	$(GOBUILD) -ldflags "-X main.commit=$(COMMIT)" -o sixer
 
 # make deps
 deps:

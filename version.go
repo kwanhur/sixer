@@ -27,26 +27,26 @@ const (
 
 var versionCmd = &cobra.Command{
 	Use:   "version",
-	Short: "Show apisixer's version number",
+	Short: "Show sixer version number",
 	Run: func(cmd *cobra.Command, args []string) {
 		showVersion()
 	},
 }
 
 func showVersion() {
-	fmt.Printf("apisixer version:%s\n", version)
+	fmt.Printf("sixer version:%s\n", version)
 }
 
 var verboseCmd = &cobra.Command{
 	Use:   "verbose",
-	Short: "Show apisixer's verbose information",
+	Short: "Show sixer verbose information",
 	Run: func(cmd *cobra.Command, args []string) {
 		showVerbose()
 	},
 }
 
 func showVerbose() {
-	fmt.Printf("apisixer version: %s\n", version)
+	fmt.Printf("sixer version: %s\n", version)
 	fmt.Printf("go version: %s\n", runtime.Version())
 	fmt.Printf("git commit: %s\n", commit)
 }

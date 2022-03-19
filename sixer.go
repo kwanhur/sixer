@@ -23,8 +23,8 @@ import (
 var commit string
 
 var sixer = &cobra.Command{
-	Use:   "apisixer",
-	Short: "Apache APISIX release candidate verifier",
+	Use:   "sixer",
+	Short: "An Apache project repository package verifier",
 	Run:   sixerRun,
 }
 
