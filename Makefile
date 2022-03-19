@@ -88,14 +88,6 @@ precommit:
 	pre-commit autoupdate
 	pre-commit install --install-hooks
 
-# make mdlint
-mdlint:
-	$(MDLINT) $(WORKROOT)
-
-# make mdlint-fix
-mdlint-fix:
-	$(MDLINT) --fix $(WORKROOT)
-
 # make check
 check:
 	$(STATICCHECK) ./...
