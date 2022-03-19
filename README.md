@@ -14,7 +14,11 @@
   ~ limitations under the License.
   ~
 -->
+
+# Sixer
+
 ## Name
+
 An Apache project repository package verifier.
 
 ## Synopsis
@@ -47,6 +51,7 @@ Use "sixer [command] --help" for more information about a command.
 ```
 
 ### Example
+
 ```shell
 ./sixer dashboard -a "Zeping Bai" -c 2.11.0 -C 2c563dc15c54a8deb3ba08707594d4d15da76b1b 
 2022/03/19 16:56:04 github https://github.com/apache/apisix-dashboard/blob/release/2.11/CHANGELOG.md#2110 validate ok ✅
@@ -62,8 +67,13 @@ Use "sixer [command] --help" for more information about a command.
 ```
 
 ## TODO
+
 - [x] verfiy github links
 - [x] download materials from dist
 - [x] verify checksum and signature
 - [x] check license and notice
 - [ ] summary vote text plain
+
+## License
+
+[Apache License 2.0](LICENSE)
