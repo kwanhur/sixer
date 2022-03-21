@@ -4,6 +4,7 @@ go 1.17
 
 require (
 	github.com/ProtonMail/go-crypto v0.0.0-20220113124808-70ae35bab23f
+	github.com/jinzhu/copier v0.3.5
 	github.com/parnurzeal/gorequest v0.2.16
 	github.com/spf13/cobra v1.4.0
 	github.com/spf13/pflag v1.0.5

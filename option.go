@@ -26,6 +26,9 @@ var (
 	commitID  string
 	announcer string
 	timeout   uint
+
+	enableGithub bool
+	enableDist   bool
 )
 
 // BindVerFlags add Version Verbose flags
@@ -40,4 +43,9 @@ func BindGlobalFlags(flags *pflag.FlagSet) {
 	flags.StringVarP(&candidate, "candidate", "c", "", "Specify release candidate version,like 0.2.0")
 	flags.StringVarP(&announcer, "announcer", "a", "", "Specify release candidate announcer")
 	flags.StringVarP(&commitID, "commit", "C", "", "Specify release commit id")
+}
+
+func bindLinkFlags(flags *pflag.FlagSet) {
+	flags.BoolVarP(&enableGithub, "enable-github", "", true, "enable github")
+	flags.BoolVarP(&enableDist, "enable-dist", "", true, "enable dist")
 }

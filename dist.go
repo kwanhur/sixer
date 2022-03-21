@@ -31,6 +31,7 @@ import (
 	"github.com/ProtonMail/go-crypto/openpgp"
 	"github.com/ProtonMail/go-crypto/openpgp/armor"
 	"github.com/ProtonMail/go-crypto/openpgp/packet"
+	"github.com/jinzhu/copier"
 
 	"github.com/parnurzeal/gorequest"
 	"github.com/spf13/cobra"
@@ -39,7 +40,8 @@ import (
 const (
 	keyFilename = ".key"
 
-	pkgApisixDashboard = "apisix-dashboard"
+	pkgAPISix          = "apisix"
+	pkgAPISixDashboard = "apisix-dashboard"
 )
 
 // A Dist repo include package and its asc sha512
@@ -59,8 +61,8 @@ func (d *Dist) validAttrs() (bool, error) {
 	return true, nil
 }
 
-// ValidAllLinks validate URL links, include package and its src asc sha512
-func (d *Dist) ValidAllLinks() error {
+// ValidGitHubLinks validate github links
+func (d *Dist) ValidGitHubLinks() error {
 	git := &Git{
 		Repo:    d.repo,
 		Commit:  d.commit,
@@ -72,6 +74,11 @@ func (d *Dist) ValidAllLinks() error {
 		return err
 	}
 
+	return nil
+}
+
+// ValidDistLinks validate dist links
+func (d *Dist) ValidDistLinks() error {
 	links := []string{d.PackageLink(), d.SrcLink(), d.SrcAscLink(), d.SrcSha512Link()}
 	for _, link := range links {
 		if ok, err := d.Linker.Head(link); err != nil {
@@ -82,6 +89,19 @@ func (d *Dist) ValidAllLinks() error {
 		} else {
 			log.Printf("dist %s validate bad ❌\n", link)
 		}
+	}
+
+	return nil
+}
+
+// ValidAllLinks validate URL links, include package and its src asc sha512
+func (d *Dist) ValidAllLinks() error {
+	if err := d.ValidGitHubLinks(); err != nil {
+		return err
+	}
+
+	if err := d.ValidDistLinks(); err != nil {
+		return err
 	}
 
 	return nil
@@ -400,10 +420,10 @@ func (d *Dist) CheckExtras() (bool, error) {
 		switch hdr.Typeflag {
 		case tar.TypeReg:
 			switch hdr.Name {
-			case "./LICENSE":
+			case "LICENSE", "./LICENSE":
 				licFound = true
 				log.Println("LICENSE ok ✅")
-			case "./NOTICE":
+			case "NOTICE", "./NOTICE":
 				notFound = true
 				log.Println("NOTICE ok ✅")
 			}
@@ -498,11 +518,30 @@ func dist(name string) *Dist {
 	switch name {
 	case "dashboard":
 		dist = NewDashboardDist()
+	case "apisix":
+		dist = NewAPISixDist()
 	default:
 		dist = nil
 	}
 
 	return dist
+}
+
+var linkCmd = &cobra.Command{
+	Use:   "link",
+	Short: "package relate links",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		if dist := dist(cmd.Parent().Name()); dist != nil {
+			if enableDist {
+				return dist.ValidDistLinks()
+			}
+			if enableGithub {
+				return dist.ValidGitHubLinks()
+			}
+		}
+
+		return fmt.Errorf("subcommand link unsupported")
+	},
 }
 
 var loaderCmd = &cobra.Command{
@@ -517,15 +556,56 @@ var loaderCmd = &cobra.Command{
 	},
 }
 
+// NewAPISixDist apisix dist
+func NewAPISixDist() *Dist {
+	return &Dist{
+		Candidate: Candidate{
+			pkg: pkgAPISix,
+			rc:  candidate,
+			sub: false,
+		},
+		announcer: announcer,
+		repo:      pkgAPISix,
+		commit:    commitID,
+		Linker: Linker{
+			timeout: timeout,
+		},
+	}
+}
+
+var apiSixCmd = &cobra.Command{
+	Use:              "apisix",
+	Short:            "apisix package verifier",
+	PersistentPreRun: sixerPreRun,
+	PreRunE: func(cmd *cobra.Command, args []string) error {
+		dist := NewAPISixDist()
+		return dist.ValidAllLinks()
+	},
+	RunE: func(cmd *cobra.Command, args []string) error {
+		dist := NewAPISixDist()
+		if err := dist.Fetch(); err != nil {
+			return err
+		}
+
+		dist.Verify()
+		return nil
+	},
+	PostRunE: func(cmd *cobra.Command, args []string) error {
+		dist := NewAPISixDist()
+		return dist.Clean()
+	},
+}
+
 // NewDashboardDist dashboard dist
 func NewDashboardDist() *Dist {
 	return &Dist{
 		Candidate: Candidate{
-			pkg: pkgApisixDashboard,
+			pkg: pkgAPISixDashboard,
 			rc:  candidate,
+			sub: true,
 		},
 		announcer: announcer,
-		repo:      pkgApisixDashboard,
+		repo:      pkgAPISixDashboard,
 		commit:    commitID,
 		Linker: Linker{
 			timeout: timeout,
@@ -557,5 +637,20 @@ var dashboardCmd = &cobra.Command{
 }
 
 func init() {
-	dashboardCmd.AddCommand(loaderCmd)
+
+	var link1 = &cobra.Command{}
+	var link2 = &cobra.Command{}
+	_ = copier.Copy(link1, linkCmd)
+	_ = copier.Copy(link2, linkCmd)
+
+	bindLinkFlags(link1.Flags())
+	bindLinkFlags(link2.Flags())
+
+	var load1 = &cobra.Command{}
+	var load2 = &cobra.Command{}
+	_ = copier.Copy(load1, loaderCmd)
+	_ = copier.Copy(load2, loaderCmd)
+
+	apiSixCmd.AddCommand(link1, load1)
+	dashboardCmd.AddCommand(link2, load2)
 }

@@ -25,6 +25,7 @@ const (
 type Candidate struct {
 	pkg string // package name, like: apisix-dashboard
 	rc  string // release candidate version, like: 0.2.0
+	sub bool   // sub-project
 }
 
 // PackageLink complete URL for package directory
@@ -34,10 +35,14 @@ func (c *Candidate) PackageLink() string {
 
 // Package a package name with prefix "apisix"
 func (c *Candidate) Package() string {
-	return fmt.Sprintf("%s-%s", c.pkg, c.rc)
+	if c.sub {
+		return fmt.Sprintf("%s-%s", c.pkg, c.rc)
+	}
+
+	return c.rc
 }
 
-// Package2 a package name with prefix "apache-apisix"
+// Package2 a package name with prefix "apache-"
 func (c *Candidate) Package2() string {
 	return fmt.Sprintf("%s-%s-%s", pkgPrefix2, c.pkg, c.rc)
 }

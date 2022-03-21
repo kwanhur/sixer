@@ -30,7 +30,7 @@ var sixer = &cobra.Command{
 
 func init() {
 	sixer.AddCommand(versionCmd, verboseCmd)
-	sixer.AddCommand(dashboardCmd)
+	sixer.AddCommand(apiSixCmd, dashboardCmd)
 }
 
 func init() {
@@ -61,6 +61,6 @@ func sixerRun(cmd *cobra.Command, args []string) {
 
 func main() {
 	if err := sixer.Execute(); err != nil {
-		log.Fatalln("apisixer run failed:", err)
+		log.Fatalln("sixer run failed:", err)
 	}
 }

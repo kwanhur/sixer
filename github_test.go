@@ -34,7 +34,7 @@ func TestGitHub_ValidLinks(t *testing.T) {
 				},
 				git: &Git{
 					Commit:  "2c563dc15c54a8deb3ba08707594d4d15da76b1b",
-					Repo:    pkgApisixDashboard,
+					Repo:    pkgAPISixDashboard,
 					Release: "2.11.0",
 				}},
 			wantErr: false,
