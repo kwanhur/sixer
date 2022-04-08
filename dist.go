@@ -521,6 +521,8 @@ func dist(name string) *Dist {
 		dist = NewDashboardDist()
 	case "apisix":
 		dist = NewAPISixDist()
+	case "go-plugin-runner":
+		dist = NewGoPluginRunnerDist()
 	default:
 		dist = nil
 	}
@@ -697,5 +699,5 @@ func init() {
 	bindLinkFlags(link3.Flags())
 	var load3 = &cobra.Command{}
 	_ = copier.Copy(load3, loaderCmd)
-	dashboardCmd.AddCommand(link3, load3)
+	goPluginRunnerCmd.AddCommand(link3, load3)
 }
