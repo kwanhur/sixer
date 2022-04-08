@@ -40,8 +40,9 @@ import (
 const (
 	keyFilename = ".key"
 
-	pkgAPISix          = "apisix"
-	pkgAPISixDashboard = "apisix-dashboard"
+	pkgAPISix               = "apisix"
+	pkgAPISixDashboard      = "apisix-dashboard"
+	pkgAPISixGoPluginRunner = "apisix-go-plugin-runner"
 )
 
 // A Dist repo include package and its asc sha512
@@ -636,21 +637,65 @@ var dashboardCmd = &cobra.Command{
 	},
 }
 
+// NewGoPluginRunnerDist go-plugin-runner dist
+func NewGoPluginRunnerDist() *Dist {
+	return &Dist{
+		Candidate: Candidate{
+			pkg: pkgAPISixGoPluginRunner,
+			rc:  candidate,
+			sub: true,
+		},
+		announcer: announcer,
+		repo:      pkgAPISixGoPluginRunner,
+		commit:    commitID,
+		Linker: Linker{
+			timeout: timeout,
+		},
+	}
+}
+
+var goPluginRunnerCmd = &cobra.Command{
+	Use:              "go-plugin-runner",
+	Short:            "apisix go-plugin-runner package verifier",
+	PersistentPreRun: sixerPreRun,
+	PreRunE: func(cmd *cobra.Command, args []string) error {
+		dist := NewGoPluginRunnerDist()
+		return dist.ValidAllLinks()
+	},
+	RunE: func(cmd *cobra.Command, args []string) error {
+		dist := NewGoPluginRunnerDist()
+		if err := dist.Fetch(); err != nil {
+			return err
+		}
+
+		dist.Verify()
+		return nil
+	},
+	PostRunE: func(cmd *cobra.Command, args []string) error {
+		dist := NewGoPluginRunnerDist()
+		return dist.Clean()
+	},
+}
+
 func init() {
-
 	var link1 = &cobra.Command{}
-	var link2 = &cobra.Command{}
 	_ = copier.Copy(link1, linkCmd)
-	_ = copier.Copy(link2, linkCmd)
-
 	bindLinkFlags(link1.Flags())
-	bindLinkFlags(link2.Flags())
-
 	var load1 = &cobra.Command{}
-	var load2 = &cobra.Command{}
 	_ = copier.Copy(load1, loaderCmd)
-	_ = copier.Copy(load2, loaderCmd)
-
 	apiSixCmd.AddCommand(link1, load1)
+
+	var link2 = &cobra.Command{}
+	_ = copier.Copy(link2, linkCmd)
+	bindLinkFlags(link2.Flags())
+	var load2 = &cobra.Command{}
+	_ = copier.Copy(load2, loaderCmd)
 	dashboardCmd.AddCommand(link2, load2)
+
+	var link3 = &cobra.Command{}
+	_ = copier.Copy(link3, linkCmd)
+	bindLinkFlags(link3.Flags())
+	var load3 = &cobra.Command{}
+	_ = copier.Copy(load3, loaderCmd)
+	dashboardCmd.AddCommand(link3, load3)
 }
