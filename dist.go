@@ -565,6 +565,18 @@ var loaderCmd = &cobra.Command{
 	},
 }
 
+var cleanCmd = &cobra.Command{
+	Use:   "clean",
+	Short: "cleanup package files",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		if dist := dist(cmd.Parent().Name()); dist != nil {
+			return dist.Clean()
+		}
+
+		return fmt.Errorf("subcommand clean unsupported")
+	},
+}
+
 // NewAPISixDist apisix dist
 func NewAPISixDist() *Dist {
 	return &Dist{
@@ -695,19 +707,25 @@ func init() {
 	bindLinkFlags(link1.Flags())
 	var load1 = &cobra.Command{}
 	_ = copier.Copy(load1, loaderCmd)
-	apiSixCmd.AddCommand(link1, load1)
+	var clean1 = &cobra.Command{}
+	_ = copier.Copy(clean1, cleanCmd)
+	apiSixCmd.AddCommand(link1, load1, clean1)
 
 	var link2 = &cobra.Command{}
 	_ = copier.Copy(link2, linkCmd)
 	bindLinkFlags(link2.Flags())
 	var load2 = &cobra.Command{}
 	_ = copier.Copy(load2, loaderCmd)
-	dashboardCmd.AddCommand(link2, load2)
+	var clean2 = &cobra.Command{}
+	_ = copier.Copy(clean2, cleanCmd)
+	dashboardCmd.AddCommand(link2, load2, clean2)
 
 	var link3 = &cobra.Command{}
 	_ = copier.Copy(link3, linkCmd)
 	bindLinkFlags(link3.Flags())
 	var load3 = &cobra.Command{}
 	_ = copier.Copy(load3, loaderCmd)
-	goPluginRunnerCmd.AddCommand(link3, load3)
+	var clean3 = &cobra.Command{}
+	_ = copier.Copy(clean3, cleanCmd)
+	goPluginRunnerCmd.AddCommand(link3, load3, clean3)
 }
