@@ -52,6 +52,7 @@ type Dist struct {
 	announcer string
 	repo      string
 	commit    string
+	trimTag   bool // trim tag's suffix .0 or not
 }
 
 func (d *Dist) validAttrs() (bool, error) {
@@ -64,10 +65,15 @@ func (d *Dist) validAttrs() (bool, error) {
 
 // ValidGitHubLinks validate github links
 func (d *Dist) ValidGitHubLinks() error {
+	tag := d.rc
+	if d.trimTag {
+		tag = strings.TrimSuffix(tag, ".0")
+	}
 	git := &Git{
 		Repo:    d.repo,
 		Commit:  d.commit,
 		Release: d.rc,
+		Tag:     tag,
 	}
 
 	github, _ := NewGitHub(git)
@@ -571,6 +577,7 @@ func NewAPISixDist() *Dist {
 		announcer: announcer,
 		repo:      pkgAPISix,
 		commit:    commitID,
+		trimTag:   true,
 		Linker: Linker{
 			timeout: timeout,
 		},
@@ -612,6 +619,7 @@ func NewDashboardDist() *Dist {
 		announcer: announcer,
 		repo:      pkgAPISixDashboard,
 		commit:    commitID,
+		trimTag:   true,
 		Linker: Linker{
 			timeout: timeout,
 		},

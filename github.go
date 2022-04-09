@@ -29,11 +29,7 @@ type Git struct {
 	Repo    string
 	Commit  string
 	Release string
-}
-
-// Tag fetch tag from release, 2.11.0 -> 2.11
-func (g *Git) Tag() string {
-	return strings.TrimSuffix(g.Release, ".0")
+	Tag     string
 }
 
 // MarkdownID fetch markdown from release, 2.11.0 -> 2110
@@ -63,7 +59,7 @@ func NewGitHub(g *Git) (*GitHub, error) {
 }
 
 func (g *GitHub) releaseNoteLink() string {
-	return fmt.Sprintf("%s/%s/blob/release/%s/CHANGELOG.md#%s", githubApacheOgz, g.git.Repo, g.git.Tag(), g.git.MarkdownID())
+	return fmt.Sprintf("%s/%s/blob/release/%s/CHANGELOG.md#%s", githubApacheOgz, g.git.Repo, g.git.Tag, g.git.MarkdownID())
 }
 
 func (g *GitHub) releaseCommitLink() string {
