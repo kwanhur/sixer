@@ -563,9 +563,10 @@ var loaderCmd = &cobra.Command{
 func NewAPISixDist() *Dist {
 	return &Dist{
 		Candidate: Candidate{
-			pkg: pkgAPISix,
-			rc:  candidate,
-			sub: false,
+			pkg:       pkgAPISix,
+			rc:        candidate,
+			sub:       false,
+			pkgPrefix: prefixApache,
 		},
 		announcer: announcer,
 		repo:      pkgAPISix,
@@ -603,9 +604,10 @@ var apiSixCmd = &cobra.Command{
 func NewDashboardDist() *Dist {
 	return &Dist{
 		Candidate: Candidate{
-			pkg: pkgAPISixDashboard,
-			rc:  candidate,
-			sub: true,
+			pkg:       pkgAPISixDashboard,
+			rc:        candidate,
+			sub:       true,
+			pkgPrefix: prefixApache,
 		},
 		announcer: announcer,
 		repo:      pkgAPISixDashboard,

@@ -17,15 +17,16 @@ package main
 import "fmt"
 
 const (
-	baseLink   = "https://dist.apache.org/repos/dist/dev/apisix/"
-	pkgPrefix2 = "apache"
+	baseLink     = "https://dist.apache.org/repos/dist/dev/apisix/"
+	prefixApache = "apache"
 )
 
 // A Candidate represents package with specified version
 type Candidate struct {
-	pkg string // package name, like: apisix-dashboard
-	rc  string // release candidate version, like: 0.2.0
-	sub bool   // sub-project
+	pkg       string // package name, like: apisix-dashboard
+	rc        string // release candidate version, like: 0.2.0
+	sub       bool   // sub-project
+	pkgPrefix string // package name prefix, like:apache
 }
 
 // PackageLink complete URL for package directory
@@ -42,13 +43,17 @@ func (c *Candidate) Package() string {
 	return c.rc
 }
 
-// Package2 a package name with prefix "apache-"
-func (c *Candidate) Package2() string {
-	return fmt.Sprintf("%s-%s-%s", pkgPrefix2, c.pkg, c.rc)
+// SrcPrefix src file name with package prefix
+func (c *Candidate) SrcPrefix() string {
+	if c.pkgPrefix != "" {
+		return fmt.Sprintf("%s-%s-%s", c.pkgPrefix, c.pkg, c.rc)
+	}
+
+	return c.Package()
 }
 
 func (c *Candidate) srcTgz() string {
-	return fmt.Sprintf("%s-src.tgz", c.Package2())
+	return fmt.Sprintf("%s-src.tgz", c.SrcPrefix())
 }
 
 // SrcLink source package URL
@@ -57,7 +62,7 @@ func (c *Candidate) SrcLink() string {
 }
 
 func (c *Candidate) srcTgzAsc() string {
-	return fmt.Sprintf("%s-src.tgz.asc", c.Package2())
+	return fmt.Sprintf("%s-src.tgz.asc", c.SrcPrefix())
 }
 
 // SrcAscLink source package asc URL
@@ -66,7 +71,7 @@ func (c *Candidate) SrcAscLink() string {
 }
 
 func (c *Candidate) srcTgzSha512() string {
-	return fmt.Sprintf("%s-src.tgz.sha512", c.Package2())
+	return fmt.Sprintf("%s-src.tgz.sha512", c.SrcPrefix())
 }
 
 // SrcSha512Link source package sha512 URL
