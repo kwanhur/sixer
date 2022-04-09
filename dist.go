@@ -206,8 +206,8 @@ func (d *Dist) validKey() (bool, error) {
 		return false, err
 	}
 
-	if len(entities) != 1 {
-		return false, fmt.Errorf("should be one entity in key")
+	if len(entities) == 0 {
+		return false, fmt.Errorf("not found any entity")
 	}
 
 	id := entities[0].PrimaryIdentity()
@@ -239,7 +239,7 @@ func (d *Dist) fetchKey() error {
 	}
 
 export:
-	cmd := exec.Command("gpg", "--armor", "--output", keyFilename, "--export", d.announcer)
+	cmd := exec.Command("gpg", "--armor", "--output", keyFilename, "--yes", "--export", d.announcer)
 	if err := cmd.Run(); err != nil {
 		return err
 	}
