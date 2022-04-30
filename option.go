@@ -23,6 +23,7 @@ var (
 	Verbose bool
 
 	candidate string
+	blob      string
 	commitID  string
 	announcer string
 	timeout   uint
@@ -48,4 +49,8 @@ func BindGlobalFlags(flags *pflag.FlagSet) {
 func bindLinkFlags(flags *pflag.FlagSet) {
 	flags.BoolVarP(&enableGithub, "enable-github", "", true, "enable github")
 	flags.BoolVarP(&enableDist, "enable-dist", "", true, "enable dist")
+}
+
+func bindExtraFlags(flags *pflag.FlagSet) {
+	flags.StringVarP(&blob, "blob", "b", "", "Specify release blob, like v1.4.0")
 }

@@ -40,9 +40,10 @@ import (
 const (
 	keyFilename = ".key"
 
-	pkgAPISix               = "apisix"
-	pkgAPISixDashboard      = "apisix-dashboard"
-	pkgAPISixGoPluginRunner = "apisix-go-plugin-runner"
+	pkgAPISix                  = "apisix"
+	pkgAPISixDashboard         = "apisix-dashboard"
+	pkgAPISixIngressController = "apisix-ingress-controller"
+	pkgAPISixGoPluginRunner    = "apisix-go-plugin-runner"
 )
 
 // A Dist repo include package and its asc sha512
@@ -52,7 +53,8 @@ type Dist struct {
 	announcer string
 	repo      string
 	commit    string
-	trimTag   bool // trim tag's suffix .0 or not
+	blob      string // release-note branch, like v1.4.0, only work for links
+	trimTag   bool   // trim tag's suffix .0 or not
 }
 
 func (d *Dist) validAttrs() (bool, error) {
@@ -73,6 +75,7 @@ func (d *Dist) ValidGitHubLinks() error {
 		Repo:    d.repo,
 		Commit:  d.commit,
 		Release: d.rc,
+		Blob:    d.blob,
 		Tag:     tag,
 	}
 
@@ -529,6 +532,8 @@ func dist(name string) *Dist {
 		dist = NewAPISixDist()
 	case "go-plugin-runner":
 		dist = NewGoPluginRunnerDist()
+	case "ingress-controller":
+		dist = NewIngressControllerDist()
 	default:
 		dist = nil
 	}
@@ -661,6 +666,49 @@ var dashboardCmd = &cobra.Command{
 	},
 }
 
+// NewIngressControllerDist ingress controller dist
+func NewIngressControllerDist() *Dist {
+	return &Dist{
+		Candidate: Candidate{
+			pkg:       pkgAPISixIngressController,
+			rc:        candidate,
+			sub:       true,
+			pkgPrefix: prefixApache,
+		},
+		announcer: announcer,
+		repo:      pkgAPISixIngressController,
+		commit:    commitID,
+		blob:      blob,
+		trimTag:   true,
+		Linker: Linker{
+			timeout: timeout,
+		},
+	}
+}
+
+var ingressControllerCmd = &cobra.Command{
+	Use:              "ingress-controller",
+	Short:            "apisix ingress controller package verifier",
+	PersistentPreRun: sixerPreRun,
+	PreRunE: func(cmd *cobra.Command, args []string) error {
+		dist := NewIngressControllerDist()
+		return dist.ValidAllLinks()
+	},
+	RunE: func(cmd *cobra.Command, args []string) error {
+		dist := NewIngressControllerDist()
+		if err := dist.Fetch(); err != nil {
+			return err
+		}
+
+		dist.Verify()
+		return nil
+	},
+	PostRunE: func(cmd *cobra.Command, args []string) error {
+		dist := NewIngressControllerDist()
+		return dist.Clean()
+	},
+}
+
 // NewGoPluginRunnerDist go-plugin-runner dist
 func NewGoPluginRunnerDist() *Dist {
 	return &Dist{
@@ -728,4 +776,15 @@ func init() {
 	var clean3 = &cobra.Command{}
 	_ = copier.Copy(clean3, cleanCmd)
 	goPluginRunnerCmd.AddCommand(link3, load3, clean3)
+
+	var link4 = &cobra.Command{}
+	_ = copier.Copy(link4, linkCmd)
+	bindLinkFlags(link4.Flags())
+	bindExtraFlags(link4.Flags())
+	var load4 = &cobra.Command{}
+	_ = copier.Copy(load4, loaderCmd)
+	var clean4 = &cobra.Command{}
+	_ = copier.Copy(clean4, cleanCmd)
+	ingressControllerCmd.AddCommand(link4, load4, clean4)
+	bindExtraFlags(ingressControllerCmd.Flags())
 }

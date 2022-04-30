@@ -29,6 +29,7 @@ type Git struct {
 	Repo    string
 	Commit  string
 	Release string
+	Blob    string // only work for release-note
 	Tag     string
 }
 
@@ -59,6 +60,9 @@ func NewGitHub(g *Git) (*GitHub, error) {
 }
 
 func (g *GitHub) releaseNoteLink() string {
+	if g.git.Blob != "" {
+		return fmt.Sprintf("%s/%s/blob/%s/CHANGELOG.md#%s", githubApacheOgz, g.git.Repo, g.git.Blob, g.git.MarkdownID())
+	}
 	return fmt.Sprintf("%s/%s/blob/release/%s/CHANGELOG.md#%s", githubApacheOgz, g.git.Repo, g.git.Tag, g.git.MarkdownID())
 }
 

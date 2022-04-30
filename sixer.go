@@ -30,7 +30,7 @@ var sixer = &cobra.Command{
 
 func init() {
 	sixer.AddCommand(versionCmd, verboseCmd)
-	sixer.AddCommand(apiSixCmd, dashboardCmd)
+	sixer.AddCommand(apiSixCmd, dashboardCmd, ingressControllerCmd)
 	sixer.AddCommand(goPluginRunnerCmd)
 }
 
