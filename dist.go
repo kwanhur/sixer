@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"net"
 	"net/http"
 	"os"
 	"os/exec"
@@ -594,6 +595,7 @@ func NewAPISixDist() *Dist {
 		announcer: announcer,
 		repo:      pkgAPISix,
 		commit:    commitID,
+		blob:      blob,
 		trimTag:   true,
 		Linker: Linker{
 			timeout: timeout,
@@ -668,6 +670,8 @@ var dashboardCmd = &cobra.Command{
 
 // NewIngressControllerDist ingress controller dist
 func NewIngressControllerDist() *Dist {
+	ip := net.ParseIP("::1/128")
+	ip.IsLinkLocalMulticast()
 	return &Dist{
 		Candidate: Candidate{
 			pkg:       pkgAPISixIngressController,
@@ -758,6 +762,7 @@ func init() {
 	var clean1 = &cobra.Command{}
 	_ = copier.Copy(clean1, cleanCmd)
 	apiSixCmd.AddCommand(link1, load1, clean1)
+	bindExtraFlags(apiSixCmd.Flags())
 
 	var link2 = &cobra.Command{}
 	_ = copier.Copy(link2, linkCmd)
